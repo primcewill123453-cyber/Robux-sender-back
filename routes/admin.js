@@ -34,16 +34,30 @@ router.get('/keys', requireAdmin, async (req, res) => {
 
 router.post('/keys/generate', requireAdmin, async (req, res) => {
   const count = Math.max(1, Math.min(parseInt(req.body?.count, 10) || 1, 100));
-  const hoursRaw = parseInt(req.body?.durationHours, 10);
-  const isLifetime = hoursRaw === 0;
-  const durationMs = isLifetime ? null : Math.max(1, hoursRaw || 24) * 3600 * 1000;
+  const hours = parseInt(req.body?.durationHours, 10) || 24;
   const note = String(req.body?.note || '');
   const docs = [];
   for (let i = 0; i < count; i++) {
-    docs.push({ code: generateCode(), durationMs, note, createdBy: 'admin' });
+    docs.push({
+      code: generateCode(),
+      durationMs: hours === 0 ? null : hours * 3600 * 1000,
+      expiresAt: hours === 0 ? null : new Date(Date.now() + hours * 3600 * 1000),
+      note,
+      createdBy: 'admin',
+    });
   }
   const created = await Key.insertMany(docs);
-  res.json({ created: created.map((k) => ({ code: k.code, lifetime: isLifetime, durationHours: isLifetime ? null : hoursRaw })) });
+  res.json({ created: created.map((k) => ({ code: k.code, durationHours: hours })) });
+});
+
+// Delete ALL keys — must be before /keys/:code so Express doesn't treat 'all' as a code
+router.delete('/keys/all', requireAdmin, async (req, res) => {
+  try {
+    const result = await Key.deleteMany({});
+    res.json({ ok: true, deleted: result.deletedCount });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.delete('/keys/:code', requireAdmin, async (req, res) => {
