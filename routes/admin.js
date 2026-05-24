@@ -34,14 +34,16 @@ router.get('/keys', requireAdmin, async (req, res) => {
 
 router.post('/keys/generate', requireAdmin, async (req, res) => {
   const count = Math.max(1, Math.min(parseInt(req.body?.count, 10) || 1, 100));
-  const hours = Math.max(1, parseInt(req.body?.durationHours, 10) || 24);
+  const hoursRaw = parseInt(req.body?.durationHours, 10);
+  const isLifetime = hoursRaw === 0;
+  const durationMs = isLifetime ? null : Math.max(1, hoursRaw || 24) * 3600 * 1000;
   const note = String(req.body?.note || '');
   const docs = [];
   for (let i = 0; i < count; i++) {
-    docs.push({ code: generateCode(), durationMs: hours * 3600 * 1000, note, createdBy: 'admin' });
+    docs.push({ code: generateCode(), durationMs, note, createdBy: 'admin' });
   }
   const created = await Key.insertMany(docs);
-  res.json({ created: created.map((k) => ({ code: k.code, durationHours: hours })) });
+  res.json({ created: created.map((k) => ({ code: k.code, lifetime: isLifetime, durationHours: isLifetime ? null : hoursRaw })) });
 });
 
 router.delete('/keys/:code', requireAdmin, async (req, res) => {
