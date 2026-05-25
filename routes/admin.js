@@ -34,7 +34,8 @@ router.get('/keys', requireAdmin, async (req, res) => {
 
 router.post('/keys/generate', requireAdmin, async (req, res) => {
   const count = Math.max(1, Math.min(parseInt(req.body?.count, 10) || 1, 100));
-  const hours = parseInt(req.body?.durationHours, 10) || 24;
+  const rawHours = parseInt(req.body?.durationHours, 10);
+  const hours = isNaN(rawHours) ? 24 : rawHours; // 0 = lifetime, no forced minimum
   const note = String(req.body?.note || '');
   const docs = [];
   for (let i = 0; i < count; i++) {
@@ -50,7 +51,7 @@ router.post('/keys/generate', requireAdmin, async (req, res) => {
   res.json({ created: created.map((k) => ({ code: k.code, durationHours: hours })) });
 });
 
-// Delete ALL keys — must be before /keys/:code so Express doesn't treat 'all' as a code
+// Delete ALL keys — must be before /keys/:code
 router.delete('/keys/all', requireAdmin, async (req, res) => {
   try {
     const result = await Key.deleteMany({});
